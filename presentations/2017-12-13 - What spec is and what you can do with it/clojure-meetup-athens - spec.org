@@ -1,0 +1,641 @@
+#+Title: What spec is and what you can do with it
+#+Author: Stathis Sideris
+
+* What spec is and what you can do with it
+
+
+
+
+         What spec is and what you can do with it
+
+
+
+                     Stathis Sideris
+
+* What is it?
+
+
+
+
+           Declarative data description
+
+
+           The answer to lack of types
+
+
+           Cash-in on dynamic nature of Clojure
+* What does it look like?
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[clojure.spec.alpha :as s])
+
+  (s/def ::username string?)
+
+  (println
+   (s/valid? ::username "foo"))
+#+END_SRC
+
+#+RESULTS:
+: true
+
+* It's just predicates
+
+  Just predicates!
+
+#+BEGIN_SRC clojure :exports both
+  (s/valid? #(> % 5) 10)
+#+END_SRC
+
+#+RESULTS:
+: true
+
+#+BEGIN_SRC clojure :exports both
+  (s/valid? #(> % 5) 3)
+#+END_SRC
+
+#+RESULTS:
+: false
+
+* Validate data
+
+[[file:validate-data.png]]
+* Collections specs
+
+  Collections
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[clojure.spec.alpha :as s])
+
+  (s/def ::username string?)
+  (s/def ::usernames (s/coll-of ::username))
+
+  (println
+   (s/valid? ::usernames ["foo" "bar" "baz"]))
+#+END_SRC
+
+#+RESULTS:
+: true
+
+* Maps
+
+  Maps
+
+#+BEGIN_SRC clojure :results output :exports both
+  (ns my-project.users
+    (:require [clojure.spec.alpha :as s]))
+
+  (s/def ::username string?)
+  (s/def ::password string?)
+
+  (s/def ::last-login number?)
+  (s/def ::comment string?)
+
+  (s/def ::user
+    (s/keys
+     :req [::username ::password]
+     :opt [::comment ::last-login]))
+
+  (println ::username)
+
+  (println
+   (s/valid?
+    ::user
+    {::username   "rich"
+     ::password   "zegure"
+     ::comment    "this is a user"
+     ::last-login 11000}))
+#+END_SRC
+
+#+RESULTS:
+: :my-project.users/username
+: true
+
+* Maps are open
+
+  Maps are open
+
+#+BEGIN_SRC clojure :results output :exports both
+  (ns my-project.users
+    (:require [clojure.spec.alpha :as s]))
+
+  (s/def ::username string?)
+  (s/def ::password string?)
+
+  (s/def ::last-login number?)
+  (s/def ::comment string?)
+
+  (s/def ::user
+    (s/keys
+     :req [::username ::password]
+     :opt [::comment ::last-login]))
+
+  (println
+   (s/valid?
+    ::user
+    {::username   "rich"
+     ::password   "zegure"
+     ::comment    "this is a user"
+     ::last-login 11000
+     ::age        26}))
+#+END_SRC
+
+#+RESULTS:
+: true
+
+* Compose specs
+
+  Compose specs with ~s/and~ and ~s/or~.
+
+* Explain
+
+  Explain
+
+#+BEGIN_SRC clojure :results output :exports both
+  (ns my-project.users
+    (:require [clojure.spec.alpha :as s]))
+
+  (s/def ::username string?)
+  (s/def ::password string?)
+
+  (s/def ::last-login number?)
+  (s/def ::comment string?)
+
+  (s/def ::user
+    (s/keys
+     :req [::username ::password]
+     :opt [::comment ::last-login]))
+
+  (s/explain
+   ::user
+   {::username   "rich"
+    ::comment    "this is a user"})
+#+END_SRC
+
+#+RESULTS:
+: val: #:my-project.users{:username "rich", :comment "this is a user"} fails spec: :my-project.users/user predicate: (contains? % :my-project.users/password)
+
+* Sequence specs - regular expressions for data: 1
+
+  Sequences (cat)
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[clojure.spec.alpha :as s])
+
+  (s/def ::ingredient (s/cat :quantity number? :unit keyword?))
+
+  (prn (s/conform ::ingredient [2 :teaspoon]))
+#+END_SRC
+
+#+RESULTS:
+: {:quantity 2, :unit :teaspoon}
+
+* Sequence specs - regular expressions for data: 2
+
+  Parsing
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[clojure.spec.alpha :as s]
+           '[clojure.pprint :as pp])
+
+  (def function-code1
+    '(defn my-function
+       "this is a test function"
+       [x y]
+       (+ x y)))
+
+  (s/def ::function (s/cat :defn #{'defn}
+                           :name symbol?
+                           :doc (s/? string?)
+                           :args vector?
+                           :body (s/+ list?)))
+
+  (pp/pprint
+   (s/conform ::function function-code1))
+#+END_SRC
+
+#+RESULTS:
+: {:defn defn,
+:  :name my-function,
+:  :doc "this is a test function",
+:  :args [x y],
+:  :body [(+ x y)]}
+
+* Sequence specs - regular expressions for data: 3
+
+  Parsing
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[clojure.spec.alpha :as s]
+           '[clojure.pprint :as pp])
+
+  (def function-code1
+    '(defn my-function
+       [x y]
+       (+ x y)))
+
+  (s/def ::function (s/cat :defn #{'defn}
+                           :name symbol?
+                           :doc (s/? string?)
+                           :args vector?
+                           :body (s/+ list?)))
+
+  (pp/pprint
+   (s/conform ::function function-code1))
+#+END_SRC
+
+#+RESULTS:
+: {:defn defn, :name my-function, :args [x y], :body [(+ x y)]}
+
+** Generate data
+
+   Generate
+
+   #+BEGIN_SRC clojure :results output
+     (ns my-project.users
+       (:require [clojure.spec.alpha :as s]
+                 [clojure.spec.gen.alpha :as gen]
+                 [net.cgrand.packed-printer :as ppp]))
+
+     (s/def ::username string?)
+     (s/def ::password string?)
+
+     (s/def ::last-login number?)
+     (s/def ::comment string?)
+
+     (s/def ::user
+       (s/keys
+        :req [::username ::password]
+        :opt [::comment ::last-login]))
+
+     (ppp/pprint
+      (gen/sample (s/gen ::user) 5))
+   #+END_SRC
+
+   #+RESULTS:
+   : ({:my-project.users/username "", :my-project.users/password "",
+   :   :my-project.users/comment "", :my-project.users/last-login 0}
+   :  {:my-project.users/username "L", :my-project.users/password "G",
+   :   :my-project.users/last-login 3.0, :my-project.users/comment "a"}
+   :  {:my-project.users/username "Q", :my-project.users/password "",
+   :   :my-project.users/comment "qO", :my-project.users/last-login 0}
+   :  {:my-project.users/username "", :my-project.users/password "", :my-project.users/last-login 0}
+   :  {:my-project.users/username "M6", :my-project.users/password "nyX0"})
+
+* Specs for functions
+
+#+ATTR_ORG: :width 700
+[[file:validate-function.png]]
+* Specs for functions - generative testing
+
+#+ATTR_ORG: :width 700
+[[file:generative-testing.png]]
+
+* Specs for functions: Happy path
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[clojure.spec.alpha :as s]
+           '[clojure.spec.test.alpha :as stest]
+           '[clojure.pprint :as pp])
+
+  (defn num-sort [coll]
+    (sort coll))
+
+  (s/fdef num-sort
+    :args (s/cat :coll (s/coll-of number?))
+    :ret  (s/coll-of number?)
+    :fn   (s/and #(= (-> % :ret) (-> % :args :coll sort))
+                 #(= (-> % :ret count) (-> % :args :coll count))))
+  (pp/pprint
+   (stest/check `num-sort))
+#+END_SRC
+
+#+RESULTS:
+: ({:spec
+:   #object[clojure.spec.alpha$fspec_impl$reify__9037 0x67ae26bc "clojure.spec.alpha$fspec_impl$reify__9037@67ae26bc"],
+:   :clojure.spec.test.check/ret
+:   {:result true, :num-tests 1000, :seed 1513253929062},
+:   :sym bsq.vd.sony.error-reporting.reporting/num-sort})
+
+* Specs for functions: Broken
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[clojure.spec.alpha :as s]
+           '[clojure.spec.test.alpha :as stest]
+           '[net.cgrand.packed-printer :as ppp])
+
+  (defn num-sort [coll]
+    (if (seq (filter #(= % 3) coll))
+      (repeat (count coll) 888)
+      (sort coll)))
+
+  (s/fdef num-sort
+    :args (s/cat :coll (s/coll-of number?))
+    :ret  (s/coll-of number?)
+    :fn   (s/and #(= (-> % :ret) (-> % :args :coll sort))
+                 #(= (-> % :ret count) (-> % :args :coll count))))
+
+  (-> (stest/check `num-sort)
+      first
+      :clojure.spec.test.check/ret
+      (select-keys [:num-tests :fail :shrunk])
+      (update-in [:shrunk :result-data :clojure.test.check.properties/error]
+                 #(-> % ex-data (dissoc :clojure.spec.alpha/spec)))
+      (ppp/pprint :width 60))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+{:num-tests 6, :fail [([-1 1.0625 -1 3 -3 -0.5])],
+ :shrunk {:total-nodes-visited 10, :depth 3, :result false,
+          :result-data
+            {:clojure.test.check.properties/error
+               {:clojure.spec.alpha/problems
+                  [{:path [:fn],
+                    :pred (clojure.core/fn [%]
+                           (clojure.core/= (clojure.core/-> % :ret)
+                            (clojure.core/-> % :args :coll clojure.core/sort))),
+                    :val {:args {:coll [3]}, :ret (888)}, :via [], :in []}],
+                :clojure.spec.alpha/value {:args {:coll [3]}, :ret (888)},
+                :clojure.spec.test.alpha/args ([3]),
+                :clojure.spec.test.alpha/val {:args {:coll [3]}, :ret (888)},
+                :clojure.spec.alpha/failure :check-failed}},
+          :smallest [([3])]}}
+#+end_example
+
+* Shrinking
+
+#+ATTR_ORG: :width 750
+[[file:shrinking.png]]
+* What is it good for?
+
+    - Validation
+    - Error reporting (?) - expound, phrase
+    - Destructuring/parsing
+    - Instrumentation
+    - Test-data generation
+    - Generative testing
+* Infer specs from data - 1
+
+#+ATTR_ORG: :width 1000
+[[file:spec-provider.png]]
+* Infer specs from data - 2
+
+#+BEGIN_SRC clojure :results output :exports both
+  (require '[spec-provider.provider :as sp])
+
+  (sp/pprint-specs
+   (sp/infer-specs
+    [{:a 8  :b "foo" :c [:k :l]}
+     {:a 10 :b "bar" :c ["k" "kk"]}
+     {:a 1  :b "baz" :c ["k" "oo"] :d "boo"}]
+    :toy/small-map)
+   'toy 's)
+#+END_SRC
+
+#+RESULTS:
+: (s/def ::d string?)
+: (s/def ::c (s/coll-of (s/or :keyword keyword? :string string?)))
+: (s/def ::b string?)
+: (s/def ::a integer?)
+: (s/def ::small-map (s/keys :req-un [::a ::b ::c] :opt-un [::d]))
+
+** ...and use the spec to generate more data of the same shape
+
+ #+BEGIN_SRC clojure :results output :exports both
+   (require '[clojure.spec.alpha :as s]
+            '[clojure.spec.gen.alpha :as gen]
+            '[net.cgrand.packed-printer :as ppp])
+
+   (s/def ::d string?)
+   (s/def ::c (s/coll-of (s/or :keyword keyword? :string string?)))
+   (s/def ::b string?)
+   (s/def ::a integer?)
+   (s/def ::small-map (s/keys :req-un [::a ::b ::c]))
+
+   (ppp/pprint
+    (gen/sample (s/gen ::small-map) 5))
+ #+END_SRC
+
+ #+RESULTS:
+ : ({:a -1, :b "", :c ["" :g :g :s :+]} {:a 0, :b "", :c [:- :Q "H" "4" "w"]}
+ :  {:a 0, :b "", :c ["3G" "j" "Hj" "" :Y :D "" :_i/+ :R9/H_ :?W/* :C "9l" "" "" "Zb" ""]}
+ :  {:a 0, :b "Cdi", :c [:Q :e/n_ "" "" :l/G- :_ :n7/-f "I8C"
+ :                       :Df/+f :*6/KP :q/!p :? :A/_1 "32k"]}
+ :  {:a -2, :b "88", :c [:*/?S :fX "OH" "" :b/- :YF :YI/s "4Q" "3"]})
+
+* Access data with lenses - 1
+
+  #+BEGIN_SRC clojure :results output :session lenses :exports both
+    (ns my-ns
+      (:require [spectacles.lenses :as lens]
+                [clojure.spec.alpha :as s]))
+
+
+    (s/def ::filename string?)
+    (s/def ::dims (s/coll-of string?))
+    (s/def ::target-dims (s/keys :req-un [::dims]
+                                 :opt-un [::the-cat]))
+    (s/def ::the-cat (s/cat :a string? :b number?))
+    (s/def ::top (s/keys :req-un [::filename ::target-dims]))
+
+
+    (def top {:filename "foo" :target-dims {:dims ["foo" "bar"]}})
+
+    (prn (lens/get top ::top :filename))
+  #+END_SRC
+
+  #+RESULTS:
+  : "foo"
+
+* Access data with lenses - 2
+
+  #+BEGIN_SRC clojure :results output :session lenses :exports both
+    (ns my-ns
+      (:require [spectacles.lenses :as lens]
+                [clojure.spec.alpha :as s]))
+
+
+    (s/def ::filename string?)
+    (s/def ::dims (s/coll-of string?))
+    (s/def ::target-dims (s/keys :req-un [::dims]
+                                 :opt-un [::the-cat]))
+    (s/def ::the-cat (s/cat :a string? :b number?))
+    (s/def ::top (s/keys :req-un [::filename ::target-dims]))
+
+
+    (def top {:filename "foo" :target-dims {:dims ["foo" "bar"]}})
+
+    (lens/get top ::top :WRONG)
+  #+END_SRC
+
+  #+RESULTS:
+  : class clojure.lang.ExceptionInfoclass clojure.lang.ExceptionInfoExceptionInfo Invalid key :WRONG for spec :my-ns/top (valid keys: #{:target-dims :filename})  clojure.core/ex-info (core.clj:4739)
+
+* Access data with lenses - 3
+
+  #+BEGIN_SRC clojure :results output :session lenses :exports both
+    (ns my-ns
+      (:require [spectacles.lenses :as lens]
+                [clojure.spec.alpha :as s]))
+
+
+    (s/def ::filename string?)
+    (s/def ::dims (s/coll-of string?))
+    (s/def ::target-dims (s/keys :req-un [::dims]
+                                 :opt-un [::the-cat]))
+    (s/def ::the-cat (s/cat :a string? :b number?))
+    (s/def ::top (s/keys :req-un [::filename ::target-dims]))
+
+
+    (def top {:filename "foo" :target-dims {:dims ["foo" "bar"]}})
+
+    (lens/assoc-in top [::top :target-dims :dims] 4)
+  #+END_SRC
+
+  #+RESULTS:
+  : class clojure.lang.ExceptionInfoclass clojure.lang.ExceptionInfoExceptionInfo Invalid value 4 for key :dims in value {:dims ["foo" "bar"]} (should conform to: (clojure.spec.alpha/coll-of clojure.core/string?))  clojure.core/ex-info (core.clj:4739)
+
+* Gain confidence that different implementations are equivalent - 1
+
+  - If args are the same, verify using common generator
+
+  #+ATTR_ORG: :width 750
+  [[file:equivalent-functions.png]]
+
+* Gain confidence that different implementations are equivalent - 2
+
+  - If args are different:
+    - generate for bigger args
+    - transform args for smaller function
+    - run both
+    - transform results
+    - assert equality
+
+#+ATTR_ORG: :width 850
+[[file:related-functions.png]]
+
+* Gain confidence that different implementations are equivalent - example
+
+#+BEGIN_SRC clojure :exports both
+  ;; calculation
+
+  {:foo 10 :bar 20} => fn1 => {:foo 10 :bar 20 :res 0.5}
+
+
+  ;; batch calculation
+
+  [{:foo 10 :bar 20}
+   {:foo 11 :bar 25}
+   {:foo 12 :bar 26}
+   {:foo 13 :bar 27}]
+
+  =>
+
+  fn2
+
+  => [{:foo 10 :bar 20 :res 0.5}
+      {:foo 11 :bar 25 :res 10.9}
+      {:foo 12 :bar 26 :res 6.9}
+      {:foo 13 :bar 27 :res 181.9}]
+#+END_SRC
+
+* Validate external system
+
+    To validate external system...
+
+    ...spec the interface to the system and ~test/check~ it.
+
+    #+ATTR_ORG: :width 500
+    [[file:validate-external-system.png]]
+
+* Replace a system
+
+  Replace a system
+
+  Abstract access to system 1 and system 2, ~test/check~ both systems
+  using the same functions.
+
+  #+ATTR_ORG: :width 500
+  [[file:validate-external-system.png]]
+
+  Using spec to Transparently Replace a Legacy System - Daniel Solano Gómez
+
+  https://www.youtube.com/watch?v=vTw7mWtaGw4
+
+* Describe APIs
+
+  Describe APIs
+
+  Validation for server
+
+  Automatic client
+
+  Automatic mock server
+
+  Automatic documentation
+
+  Like Haskell servant
+
+* Documentation/communication
+
+  Documentation
+
+
+  Communication
+
+
+  The spec becomes your ontology
+* Understanding
+
+  Generative testing drives understanding
+
+
+  * Assumptions about inputs emerge
+    * Range constraints for numbers
+    * Ranked values
+    * Co-occurence of parameters
+    * References
+* Self-healing code
+
+  Self-healing code
+
+
+  Genetic Programming with clojure.spec - Carin Meier
+
+  https://www.youtube.com/watch?v=xvk-Gnydn54
+
+* Spec problems
+
+  Problems
+
+  * Still alpha
+  * Sometimes slow
+  * Errors sometimes too large
+  * Openness of maps
+  * Custom generators are often necessary
+  * Generated values can grow very large (size param)
+  * Building test check Generators - Gary Fredericks
+
+    https://www.youtube.com/watch?v=F4VZPxLZUdA
+
+  * No metadata (yet)
+  * Testing problems - being worked on (Alex Miller)
+    * custom :args generator
+    * generators that create excessively large inputs
+    * check performance
+    * difficulty of writing :fn specs that adequately cover the
+      actual functionality of your code
+* Thank you
+
+  Thank you!
+
+  Stathis Sideris
+
+
+  [[file:twitter-logo.png]] [[https://twitter.com/stathissideris][@stathissideris]]
+
+
+  [[file:github-logo.png]]  https://github.com/stathissideris
+
+
+  [[file:pixelated-noise-logo.png]]
